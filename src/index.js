@@ -20,30 +20,33 @@ const Index = () => {
       status: 'p',
       index: todos.length > 0 ? todos[todos.length - 1].index + 1 : 1
     };
-    const newTodos = [...todos, newTodo].sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate));
+    const newTodos = [...todos, newTodo];
     setTodos(newTodos);
     localStorage.setItem('todos', JSON.stringify(newTodos));
   };
 
   const completeTodo = (index) => {
-    const newTodos = todos.map((todo, i) =>
-      i === index ? { ...todo, status: 'c' } : todo
+    const newTodos = todos.map((todo) =>
+      todo.index === index ? { ...todo, status: 'c' } : todo
     );
     setTodos(newTodos);
     localStorage.setItem('todos', JSON.stringify(newTodos));
   };
 
   const deleteTodo = (index) => {
-    const newTodos = todos.filter((_, i) => i !== index);
+    const newTodos = todos.filter((todo) => todo.index !== index);
     setTodos(newTodos);
     localStorage.setItem('todos', JSON.stringify(newTodos));
   };
 
   const updateTodo = (index) => {
-    const updatedText = prompt('Update the task:', todos[index].text);
+    const todoToUpdate = todos.find(todo => todo.index === index);
+    const updatedText = prompt('Update the task:', todoToUpdate.text);
+    const updatedDueDate = prompt('Update the due date (YYYY-MM-DD):', todoToUpdate.dueDate);
+    
     if (updatedText !== null && updatedText.trim() !== '') {
-      const newTodos = todos.map((todo, i) =>
-        i === index ? { ...todo, text: updatedText } : todo
+      const newTodos = todos.map((todo) =>
+        todo.index === index ? { ...todo, text: updatedText, dueDate: updatedDueDate || todo.dueDate } : todo
       );
       setTodos(newTodos);
       localStorage.setItem('todos', JSON.stringify(newTodos));
@@ -51,20 +54,20 @@ const Index = () => {
   };
 
   const toggleCritical = (index) => {
-    const newTodos = todos.map((todo, i) =>
-      i === index ? { ...todo, critical: !todo.critical } : todo
+    const newTodos = todos.map((todo) =>
+      todo.index === index ? { ...todo, critical: !todo.critical } : todo
     );
     setTodos(newTodos);
     localStorage.setItem('todos', JSON.stringify(newTodos));
   };
 
   const moveTask = (index, direction) => {
+    const currentIndex = todos.findIndex(todo => todo.index === index);
     const newTodos = [...todos];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
     if (targetIndex >= 0 && targetIndex < newTodos.length) {
-      const temp = newTodos[index];
-      newTodos[index] = newTodos[targetIndex];
-      newTodos[targetIndex] = temp;
+      [newTodos[currentIndex], newTodos[targetIndex]] = [newTodos[targetIndex], newTodos[currentIndex]];
       setTodos(newTodos);
       localStorage.setItem('todos', JSON.stringify(newTodos));
     }
@@ -76,7 +79,15 @@ const Index = () => {
     document.body.style.color = !isDarkMode ? 'white' : 'black';
   };
 
-  const filteredTodos = todos.filter(todo => todo.status === (filter === 'pending' ? 'p' : 'c'));
+  const sortedTodos = [...todos].sort((a, b) => {
+    if (filter === 'pending') {
+      return new Date(a.dueDate) - new Date(b.dueDate);
+    } else {
+      return new Date(b.dueDate) - new Date(a.dueDate);
+    }
+  });
+
+  const filteredTodos = sortedTodos.filter(todo => todo.status === (filter === 'pending' ? 'p' : 'c'));
 
   return (
     <div className={`form-modal`}>
@@ -168,21 +179,21 @@ const TodoList = ({ todos, completeTodo, deleteTodo, updateTodo, toggleCritical,
       </thead>
       <tbody className="table-group-divider">
         {todos.map((todo, index) => (
-          <tr key={index} className={todo.critical ? 'table-danger' : ''} style={{ backgroundColor: `rgba(255, 0, 0, ${1 - (index / todos.length)})` }}>
+          <tr key={todo.index} className={todo.critical ? 'table-danger' : ''} style={{ backgroundColor: `rgba(255, 0, 0, ${1 - (index / todos.length)})` }}>
             <td><p className='p-3'>{todo.text}</p><small>Due: {todo.dueDate}</small></td>
             <td>
               {filter === 'pending' && (
                 <>
-                  <button className='btn btn-success mx-2 mt-2' onClick={() => completeTodo(index)}>Complete</button>
-                  <button className='btn btn-info mx-2 mt-2' onClick={() => updateTodo(index)}>Update</button>
-                  <button className='btn btn-warning mx-2 mt-2' onClick={() => moveTask(index, 'up')}><i className='fas fa-arrow-up'></i></button>
-                  <button className='btn btn-warning mx-2 mt-2' onClick={() => moveTask(index, 'down')}><i className='fas fa-arrow-down'></i></button>
+                  <button className='btn btn-success mx-2 mt-2' onClick={() => completeTodo(todo.index)}>Complete</button>
+                  <button className='btn btn-info mx-2 mt-2' onClick={() => updateTodo(todo.index)}>Update</button>
+                  <button className='btn btn-warning mx-2 mt-2' onClick={() => moveTask(todo.index, 'up')}><i className='fas fa-arrow-up'></i></button>
+                  <button className='btn btn-warning mx-2 mt-2' onClick={() => moveTask(todo.index, 'down')}><i className='fas fa-arrow-down'></i></button>
                   <div className="form-check mt-2 mx-2">
                     <input
                       className="form-check-input"
                       type="checkbox"
                       checked={todo.critical}
-                      onChange={() => toggleCritical(index)}
+                      onChange={() => toggleCritical(todo.index)}
                       id={`flexCheckCritical${index}`}
                     />
                     <label className="form-check-label" htmlFor={`flexCheckCritical${index}`}>
@@ -191,9 +202,7 @@ const TodoList = ({ todos, completeTodo, deleteTodo, updateTodo, toggleCritical,
                   </div>
                 </>
               )}
-              <div className='d-flex w-100 justify-content-end'>
-                <button className='btn btn-danger mx-2 mt-2' onClick={() => deleteTodo(index)}>Delete</button>
-              </div>
+              <button className='btn btn-danger mx-2 mt-2' onClick={() => deleteTodo(todo.index)}>Delete</button>
             </td>
           </tr>
         ))}
@@ -202,6 +211,7 @@ const TodoList = ({ todos, completeTodo, deleteTodo, updateTodo, toggleCritical,
   </div>
 );
 
+export default Index;
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<Index />);
-
